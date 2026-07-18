@@ -5,6 +5,24 @@ computer on. This guide targets a **Hostinger VPS** (Ubuntu 22.04/24.04, KVM) bu
 to any Ubuntu/Debian server. With `notebooklm-py` the NotebookLM session is a saved token
 file, so **no browser has to run on the server** — that's the whole trick to going headless.
 
+## Quick install (one command)
+
+The repo ships an interactive installer that does steps 1–5 below for you — installs
+dependencies, creates the venv, prompts for your tokens, writes `.env`, checks NotebookLM
+auth, and sets up the systemd service:
+
+```bash
+sudo apt update && sudo apt install -y git
+sudo git clone https://github.com/smartcib2025/Claude4nblm.git /opt/claude4nblm
+sudo chown -R "$USER:$USER" /opt/claude4nblm
+cd /opt/claude4nblm && git checkout claude/notebooklm-telegram-mobile-waoecu
+bash scripts/setup_vps.sh
+```
+
+You'll still need to log in to NotebookLM once on your laptop (`notebooklm login`) and
+either copy `storage_state.json` to the server or paste it when the script asks — see
+step 2. The rest of this page explains what the script does, and the fully manual path.
+
 ## 1. Install on the VPS
 
 SSH into your Hostinger VPS (Hostinger panel → VPS → *SSH access* / browser terminal), then:

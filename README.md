@@ -61,7 +61,8 @@ Full step-by-step guides:
 
 - 🇹🇭 **[ภาษาไทย — docs/SETUP.th.md](docs/SETUP.th.md)**
 - 🇬🇧 **[English — docs/SETUP.en.md](docs/SETUP.en.md)**
-- 🖥️ **[24/7 VPS deployment — docs/vps-deployment.md](docs/vps-deployment.md)**
+- 🖥️ **[24/7 VPS deployment — docs/vps-deployment.md](docs/vps-deployment.md)** — includes a
+  one-command installer, `scripts/setup_vps.sh`, for Hostinger/Ubuntu servers.
 
 ## Configuration
 
