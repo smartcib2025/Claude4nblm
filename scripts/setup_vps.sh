@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# One-shot installer for claude4nblm on an Ubuntu/Debian VPS (e.g. Hostinger).
+# One-shot installer for claude4nblm on a Linux VPS (e.g. Hostinger).
+# Supports Ubuntu/Debian (apt) and AlmaLinux/Rocky/CentOS/Fedora (dnf/yum).
 # Automates: system deps → venv + install → .env → NotebookLM auth check → systemd.
 #
 # Run it from inside the cloned repo:
@@ -22,6 +23,18 @@ err()   { printf '%s\n' "${c_red}✗${c_reset} $*" >&2; }
 ask()   { local p="$1" d="${2:-}" v; if [ -n "$d" ]; then read -r -p "$p [$d]: " v || true; printf '%s' "${v:-$d}"; else read -r -p "$p: " v || true; printf '%s' "$v"; fi; }
 ask_secret() { local p="$1" v; read -r -s -p "$p: " v || true; printf '\n' >&2; printf '%s' "$v"; }
 
+# Echo the first interpreter on PATH that is Python >= 3.10, or nothing.
+pick_python() {
+    local c
+    for c in python3.13 python3.12 python3.11 python3.10 python3; do
+        if command -v "$c" >/dev/null 2>&1 \
+           && "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
+            command -v "$c"; return 0
+        fi
+    done
+    return 1
+}
+
 # Run a command as root whether or not we're already root.
 SUDO=""
 if [ "$(id -u)" -ne 0 ]; then
@@ -41,19 +54,40 @@ fi
 info "Repo root: $REPO_ROOT"
 
 # --- 1. system dependencies -----------------------------------------------
-info "Step 1/5 — system dependencies (python3, venv, git)"
+info "Step 1/5 — system dependencies (python3 ≥ 3.10, venv, git)"
 if command -v apt-get >/dev/null 2>&1; then
+    # Debian/Ubuntu — ships Python 3.10+ (22.04 = 3.10, 24.04 = 3.12).
     $SUDO apt-get update -qq
     $SUDO apt-get install -y -qq python3 python3-venv python3-pip git
-    ok "System packages ready"
+    ok "System packages ready (apt)"
+elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
+    # RHEL family (AlmaLinux/Rocky/CentOS/Fedora). AlmaLinux 8/9 default to
+    # Python 3.6/3.9, so install a newer interpreter if none is >= 3.10.
+    DNF="$(command -v dnf || command -v yum)"
+    $SUDO "$DNF" install -y -q git python3-pip || $SUDO "$DNF" install -y git python3-pip
+    if ! pick_python >/dev/null; then
+        info "No Python ≥ 3.10 found — installing python3.12 via $(basename "$DNF")"
+        $SUDO "$DNF" install -y python3.12 python3.12-pip 2>/dev/null \
+            || $SUDO "$DNF" install -y python3.11 python3.11-pip \
+            || warn "Could not install python3.12/3.11 — install a Python ≥ 3.10 manually."
+    fi
+    ok "System packages ready ($(basename "$DNF"))"
 else
-    warn "apt-get not found — ensure python3 (3.10+), python3-venv and git are installed."
+    warn "No apt/dnf/yum found — ensure Python ≥ 3.10, its venv module, and git are installed."
 fi
 
 # --- 2. virtualenv + install ----------------------------------------------
 info "Step 2/5 — Python virtualenv + install"
+PYTHON="$(pick_python || true)"
+if [ -z "$PYTHON" ]; then
+    err "No Python ≥ 3.10 interpreter found on PATH. Install one and re-run."
+    err "  Debian/Ubuntu: sudo apt install python3 python3-venv"
+    err "  AlmaLinux/RHEL: sudo dnf install python3.12"
+    exit 1
+fi
+info "Using interpreter: $PYTHON ($("$PYTHON" -V 2>&1))"
 if [ ! -d ".venv" ]; then
-    python3 -m venv .venv
+    "$PYTHON" -m venv .venv
     ok "Created .venv"
 fi
 ./.venv/bin/pip install -q --upgrade pip
