@@ -7,10 +7,10 @@ Use Claude Code + NotebookLM from your phone via Telegram. Follow these five ste
 On the computer or VPS that will run the bridge:
 
 - **Python 3.10+**
-- **Node.js** (for `npx notebooklm-mcp`)
-- **Google Chrome / Chromium** (the NotebookLM MCP server drives a real browser)
 - An **Anthropic API key** ([console.anthropic.com](https://console.anthropic.com))
 - A Google account with access to your **NotebookLM** notebooks
+- A browser **once**, to log in to NotebookLM (`notebooklm login`). This can be on your
+  laptop — you then copy the saved session to the server (see step 4).
 
 ## 1. Prepare the base system
 
@@ -21,9 +21,10 @@ git clone <your-fork-url> claude4nblm && cd claude4nblm
 pip install -e .
 ```
 
-This installs the bridge plus the **Claude Agent SDK** (which bundles the Claude Code CLI)
-and **python-telegram-bot**. The NotebookLM connection is provided by the community
-`notebooklm-mcp` server, launched automatically via `npx`.
+This installs the bridge plus the **Claude Agent SDK** (which bundles the Claude Code CLI),
+**python-telegram-bot**, and **`notebooklm-py`** (the `notebooklm` CLI). Claude reaches
+NotebookLM as its RAG source by calling that CLI; a bundled NotebookLM skill ships in
+`.claude/skills/notebooklm/` so Claude knows the commands.
 
 ## 2. Create a bot in Telegram (@BotFather)
 
@@ -49,13 +50,19 @@ Optionally set `WORKDIR`, `NOTEBOOKLM_NOTEBOOK`, or pre-authorize chats with
 
 ### One-time NotebookLM login
 
-The NotebookLM MCP server needs a Google session. Run it once interactively and use its
-`setup_auth` tool — it opens a visible Chrome where you log into Google once; the cookies
-are then persisted in a per-user Chrome profile for future runs:
+`notebooklm-py` needs a Google session. Install the browser extra and log in once — it
+opens a browser, you sign into Google, and the session is saved to
+`~/.notebooklm/profiles/default/storage_state.json`:
 
 ```bash
-npx notebooklm-mcp@latest
+pip install "notebooklm-py[browser]"
+notebooklm login
+notebooklm list        # verify: should print your notebooks
 ```
+
+On a **headless VPS**, do this login on your laptop and carry the session over — see
+[vps-deployment.md](vps-deployment.md) (copy `storage_state.json`, or paste its contents
+into `NOTEBOOKLM_AUTH_JSON`).
 
 ## 4. Run and pair
 

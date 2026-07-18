@@ -7,10 +7,10 @@
 บนคอมพิวเตอร์หรือ VPS ที่จะรันระบบ:
 
 - **Python 3.10 ขึ้นไป**
-- **Node.js** (สำหรับ `npx notebooklm-mcp`)
-- **Google Chrome / Chromium** (เซิร์ฟเวอร์ NotebookLM MCP ทำงานผ่านเบราว์เซอร์จริง)
 - **Anthropic API key** ([console.anthropic.com](https://console.anthropic.com))
 - บัญชี Google ที่เข้าถึงสมุดบันทึก **NotebookLM** ของคุณได้
+- เบราว์เซอร์ **หนึ่งครั้ง** เพื่อล็อกอิน NotebookLM (`notebooklm login`) ทำบนโน้ตบุ๊กของคุณ
+  แล้วค่อยคัดลอกเซสชันไปยังเซิร์ฟเวอร์ได้ (ดูขั้นที่ 4)
 
 ## 1. เตรียมระบบพื้นฐานบนคอมพิวเตอร์หรือ VPS
 
@@ -21,9 +21,10 @@ git clone <your-fork-url> claude4nblm && cd claude4nblm
 pip install -e .
 ```
 
-คำสั่งนี้จะติดตั้งตัวเชื่อมต่อ พร้อมกับ **Claude Agent SDK** (ซึ่งมาพร้อม Claude Code CLI ในตัว)
-และ **python-telegram-bot** ส่วนการเชื่อมต่อ NotebookLM ใช้เซิร์ฟเวอร์โอเพนซอร์ส
-`notebooklm-mcp` ที่ระบบจะเรียกผ่าน `npx` ให้อัตโนมัติ
+คำสั่งนี้จะติดตั้งตัวเชื่อมต่อ พร้อมกับ **Claude Agent SDK** (ซึ่งมาพร้อม Claude Code CLI ในตัว),
+**python-telegram-bot** และ **`notebooklm-py`** (คำสั่ง `notebooklm`) โดย Claude จะเข้าถึง
+NotebookLM ในฐานะแหล่งข้อมูล RAG ผ่านการเรียก CLI นี้ และมี skill ของ NotebookLM แถมมาที่
+`.claude/skills/notebooklm/` เพื่อให้ Claude รู้จักคำสั่งต่าง ๆ
 
 ## 2. สร้าง Bot ใน Telegram (@BotFather)
 
@@ -49,13 +50,19 @@ cp .env.example .env
 
 ### เข้าสู่ระบบ NotebookLM (ทำครั้งเดียว)
 
-เซิร์ฟเวอร์ NotebookLM MCP ต้องใช้เซสชัน Google ให้รันครั้งแรกแบบโต้ตอบและใช้เครื่องมือ
-`setup_auth` ของมัน ระบบจะเปิด Chrome ขึ้นมาให้คุณล็อกอิน Google หนึ่งครั้ง จากนั้นคุกกี้
-จะถูกบันทึกไว้ในโปรไฟล์ Chrome เพื่อใช้ในครั้งถัดไปโดยอัตโนมัติ:
+`notebooklm-py` ต้องใช้เซสชัน Google ให้ติดตั้งส่วนเสริมเบราว์เซอร์แล้วล็อกอินหนึ่งครั้ง
+ระบบจะเปิดเบราว์เซอร์ให้คุณล็อกอิน Google จากนั้นเซสชันจะถูกบันทึกไว้ที่
+`~/.notebooklm/profiles/default/storage_state.json`:
 
 ```bash
-npx notebooklm-mcp@latest
+pip install "notebooklm-py[browser]"
+notebooklm login
+notebooklm list        # ทดสอบ: ควรแสดงรายการสมุดบันทึกของคุณ
 ```
+
+ถ้าใช้ **VPS แบบ headless** ให้ล็อกอินบนโน้ตบุ๊กก่อนแล้วค่อยย้ายเซสชันไปเซิร์ฟเวอร์ — ดู
+[vps-deployment.md](vps-deployment.md) (คัดลอก `storage_state.json` หรือนำเนื้อหาไปใส่ใน
+`NOTEBOOKLM_AUTH_JSON`)
 
 ## 4. รีสตาร์ทและจับคู่ระบบ (Pairing)
 

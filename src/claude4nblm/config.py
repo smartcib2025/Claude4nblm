@@ -44,8 +44,6 @@ class Settings:
     workdir: Path = Path(".")
     system_prompt: str | None = None
     notebooklm_notebook: str | None = None
-    notebooklm_mcp_command: str = "npx"
-    notebooklm_mcp_args: list[str] = field(default_factory=lambda: ["notebooklm-mcp@latest"])
 
 
 def load_settings(env_file: str | os.PathLike[str] | None = ".env") -> Settings:
@@ -70,9 +68,6 @@ def load_settings(env_file: str | os.PathLike[str] | None = ".env") -> Settings:
 
     api_key = os.getenv("ANTHROPIC_API_KEY", "").strip() or None
 
-    mcp_args_raw = os.getenv("NOTEBOOKLM_MCP_ARGS", "").strip()
-    mcp_args = mcp_args_raw.split() if mcp_args_raw else ["notebooklm-mcp@latest"]
-
     return Settings(
         telegram_bot_token=token,
         anthropic_api_key=api_key,
@@ -81,6 +76,4 @@ def load_settings(env_file: str | os.PathLike[str] | None = ".env") -> Settings:
         workdir=Path(os.getenv("WORKDIR", ".")),
         system_prompt=os.getenv("CLAUDE_SYSTEM_PROMPT", "").strip() or None,
         notebooklm_notebook=os.getenv("NOTEBOOKLM_NOTEBOOK", "").strip() or None,
-        notebooklm_mcp_command=os.getenv("NOTEBOOKLM_MCP_COMMAND", "npx").strip() or "npx",
-        notebooklm_mcp_args=mcp_args,
     )

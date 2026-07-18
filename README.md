@@ -15,32 +15,38 @@ Telegram Bot API  ──►  Python bridge (python-telegram-bot)
                           │  prompt
                           ▼
                        Claude Agent SDK (ClaudeSDKClient)
-                          │  mcp_servers={"notebooklm": npx notebooklm-mcp}
+                          │  Bash → `notebooklm ask/list/...`
                           ▼
-                       NotebookLM MCP server ──► Chrome ──► NotebookLM
+                       notebooklm-py CLI ──► NotebookLM (RAG source)
 ```
 
 - **Telegram** is the mobile interface — you chat with a bot you create via @BotFather.
 - A **Python bridge** receives messages and drives Claude headlessly through the
   [Claude Agent SDK for Python](https://github.com/anthropics/claude-agent-sdk-python)
   (`claude-agent-sdk`, which bundles the Claude Code CLI).
-- The bridge configures the SDK to launch the community
-  [`notebooklm-mcp`](https://github.com/PleasePrompto/notebooklm-mcp) server, giving Claude
-  tools such as `ask_question`, `list_notebooks`, and `add_source`.
+- Claude reaches NotebookLM (its **RAG** source) through the
+  [`notebooklm-py`](https://github.com/teng-lin/notebooklm-py) **CLI** — `notebooklm ask`,
+  `notebooklm list`, `notebooklm source add`, … — called via the Bash tool. A bundled
+  NotebookLM **skill** (shipped in `.claude/skills/notebooklm/`) teaches Claude the CLI.
+  Its file/env-based auth (`storage_state.json` / `NOTEBOOKLM_AUTH_JSON`) is headless-
+  friendly, so no browser has to stay open on the server.
 - A **pairing-code + allowlist** flow keeps the bot private to you.
 
 ## Quickstart
 
 ```bash
-# 1. Install (Python 3.10+, Node.js, and Chrome must be present)
+# 1. Install (Python 3.10+). Add the [browser] extra for interactive login.
 pip install -e .
+pip install "notebooklm-py[browser]"   # only needed where you run `notebooklm login`
 
 # 2. Configure
 cp .env.example .env
 #   then edit .env: set TELEGRAM_BOT_TOKEN and ANTHROPIC_API_KEY
 
-# 3. One-time NotebookLM login (opens a visible Chrome; persists cookies)
-npx notebooklm-mcp@latest   # run its setup_auth, log into Google, then quit
+# 3. One-time NotebookLM login (opens a browser; saves storage_state.json)
+notebooklm login
+#   On a headless VPS, log in on your desktop and copy storage_state.json over,
+#   or paste its contents into NOTEBOOKLM_AUTH_JSON — see docs/vps-deployment.md
 
 # 4. Run
 python -m claude4nblm
@@ -69,8 +75,9 @@ All settings come from environment variables (see [`.env.example`](.env.example)
 | `ALLOWLIST_PATH` | — | Where the allowlist JSON is stored (default `./state/allowlist.json`). |
 | `WORKDIR` | — | Directory Claude runs in (file reads/writes). |
 | `CLAUDE_SYSTEM_PROMPT` | — | Override the assistant's system prompt. |
-| `NOTEBOOKLM_NOTEBOOK` | — | Default notebook to research against. |
-| `NOTEBOOKLM_MCP_COMMAND` / `NOTEBOOKLM_MCP_ARGS` | — | Override how the NotebookLM MCP server is launched. |
+| `NOTEBOOKLM_NOTEBOOK` | — | Default notebook id to research against. |
+| `NOTEBOOKLM_AUTH_JSON` | — | Headless auth: full contents of `storage_state.json` from `notebooklm login`. |
+| `NOTEBOOKLM_REFRESH_CMD` | — | Optional command the CLI runs to self-heal expired cookies. |
 
 ## Commands (in Telegram)
 
@@ -88,10 +95,12 @@ pytest
 
 ## Known limitations
 
-NotebookLM has **no official public API**. This project relies on the community
-`notebooklm-mcp` server, which automates a real Chrome session. Reliability therefore
-depends on that project and on a valid, persisted Google login. Treat it as best-effort
-automation, not a supported API.
+NotebookLM has **no official public API**. This project relies on
+[`notebooklm-py`](https://github.com/teng-lin/notebooklm-py), which drives undocumented
+Google endpoints. Reliability therefore depends on that project and on a valid, persisted
+Google login (`storage_state.json`). Sessions expire periodically — see
+`docs/vps-deployment.md` for self-healing options. Treat it as best-effort automation, not
+a supported API.
 
 ## Security
 
