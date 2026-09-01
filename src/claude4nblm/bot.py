@@ -27,7 +27,21 @@ _START_TEXT = (
     "knowledge base.\n\n"
     "Commands:\n"
     "• /reset — start a fresh conversation\n"
+    "• /diag — check the model connection\n"
     "• /allowlist — show authorized chats (admins only)"
+)
+
+# Substrings that mark a model-access (auth/provider/gateway) failure.
+_MODEL_ERROR_MARKERS = (
+    "provider",
+    "gateway",
+    "auth",
+    "credit",
+    "quota",
+    "401",
+    "403",
+    "api key",
+    "api_key",
 )
 
 
@@ -46,6 +60,7 @@ class TelegramBridge:
         self.app = Application.builder().token(settings.telegram_bot_token).build()
         self.app.add_handler(CommandHandler("start", self._on_start))
         self.app.add_handler(CommandHandler("reset", self._on_reset))
+        self.app.add_handler(CommandHandler("diag", self._on_diag))
         self.app.add_handler(CommandHandler("allowlist", self._on_allowlist))
         self.app.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self._on_message)
@@ -62,6 +77,24 @@ class TelegramBridge:
             return
         await self.runner.reset(chat_id)
         await update.message.reply_text("🧹 Conversation reset.")
+
+    async def _on_diag(self, update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
+        chat_id = update.effective_chat.id
+        if not self.allowlist.is_allowed(chat_id):
+            return
+        await update.effective_chat.send_action(ChatAction.TYPING)
+        lines = [f"🔧 Model config: {self.settings.auth_summary()}"]
+        try:
+            reply = await self.runner.ping()
+            lines.append(f"✅ Model OK — replied: {reply[:60]}")
+        except Exception as exc:  # noqa: BLE001 — report the real cause to the user
+            log.exception("Model diagnostic failed for chat %s", chat_id)
+            lines.append(f"⚠️ Model error: {exc}")
+            lines.append(
+                "Fix: check ANTHROPIC_API_KEY (valid & funded) and that "
+                "ANTHROPIC_BASE_URL is unset unless you use a gateway."
+            )
+        await update.message.reply_text("\n".join(lines))
 
     async def _on_allowlist(self, update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
         chat_id = update.effective_chat.id
@@ -97,7 +130,15 @@ class TelegramBridge:
                     await update.message.reply_text(part)
         except Exception as exc:  # noqa: BLE001 — surface failures to the user
             log.exception("Claude run failed for chat %s", chat_id)
-            await update.message.reply_text(f"⚠️ Error: {exc}")
+            reply = f"⚠️ Error: {exc}"
+            if any(m in str(exc).lower() for m in _MODEL_ERROR_MARKERS):
+                reply += (
+                    "\n\nThis looks like a model-access problem. Run /diag, and check "
+                    "ANTHROPIC_API_KEY (valid & funded) plus that ANTHROPIC_BASE_URL is "
+                    "unset unless you intend a gateway. Full traceback: "
+                    "`journalctl -u claude4nblm`."
+                )
+            await update.message.reply_text(reply)
 
     # --- pairing from the terminal --------------------------------------
     async def authorize_via_code(self, code: str) -> int | None:

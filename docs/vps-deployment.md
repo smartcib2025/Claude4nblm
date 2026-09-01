@@ -130,3 +130,30 @@ sudo journalctl -u claude4nblm -f   # follow logs
   redo the laptop login (step 2) and copy the fresh session over.
 - **Hostinger sizing:** the bridge itself is light; a small KVM plan (1–2 vCPU, 2–4 GB RAM)
   is plenty. Most memory goes to whatever Claude does per task.
+
+## Troubleshooting
+
+### Bot replies with a model-provider / gateway error
+e.g. *"The model provider failed after retries … check gateway logs"*. This means the
+**model call failed** (not NotebookLM). Diagnose it in order:
+
+1. **From your phone:** send `/diag` to the bot. It prints the (masked) model config and
+   tries a one-word model call, reporting the exact error.
+2. **On the VPS:** read the full traceback —
+   `sudo journalctl -u claude4nblm -n 100 --no-pager`. The bot also runs a **preflight**
+   at startup and logs `Model preflight OK` or `Model preflight FAILED: …`.
+3. **Check the key:** `grep -E 'ANTHROPIC_' /opt/claude4nblm/.env` — `ANTHROPIC_API_KEY`
+   must be a real, funded key. Make sure `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`
+   are **unset** unless you deliberately route through a gateway (a stale/broken base URL
+   produces exactly this error).
+4. **Test the key directly** (swap in a current model id):
+   ```bash
+   curl -s https://api.anthropic.com/v1/messages \
+     -H "x-api-key: $ANTHROPIC_API_KEY" \
+     -H "anthropic-version: 2023-06-01" \
+     -H "content-type: application/json" \
+     -d '{"model":"claude-3-5-haiku-latest","max_tokens":8,"messages":[{"role":"user","content":"hi"}]}'
+   ```
+   A `401`/authentication error → bad key; `credit`/`quota` → top up billing;
+   `not_found_error` on the model → fix the model id. After editing `.env`,
+   `sudo systemctl restart claude4nblm`.

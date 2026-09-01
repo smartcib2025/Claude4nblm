@@ -97,6 +97,27 @@ class ClaudeRunner:
                     elif isinstance(block, ToolUseBlock):
                         yield _progress_note(block)
 
+    async def ping(self) -> str:
+        """Run a trivial one-shot query to verify model access.
+
+        Uses a throwaway client so it never disturbs a chat session. Returns the
+        model's reply text; lets any exception (auth/provider/gateway failure)
+        propagate so callers can surface the real cause.
+        """
+        client = ClaudeSDKClient(options=self._options)
+        await client.connect()
+        try:
+            await client.query("Reply with the single word OK.")
+            parts: list[str] = []
+            async for message in client.receive_response():
+                if isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock):
+                            parts.append(block.text)
+            return "".join(parts).strip() or "(no text returned)"
+        finally:
+            await client.disconnect()
+
     async def reset(self, chat_id: int) -> None:
         """Drop the session for ``chat_id`` so the next message starts fresh."""
         client = self._clients.pop(chat_id, None)

@@ -33,6 +33,15 @@ def _parse_chat_ids(raw: str | None) -> list[int]:
     return ids
 
 
+def _mask(value: str | None) -> str:
+    """Return a short, non-revealing preview of a secret (never the full value)."""
+    if not value:
+        return "unset"
+    if len(value) <= 8:
+        return "set(…)"
+    return f"set({value[:6]}…{value[-2:]})"
+
+
 @dataclass(frozen=True)
 class Settings:
     """Validated application settings."""
@@ -44,6 +53,25 @@ class Settings:
     workdir: Path = Path(".")
     system_prompt: str | None = None
     notebooklm_notebook: str | None = None
+    # Model-access configuration (for diagnostics — the SDK reads these from env).
+    anthropic_base_url: str | None = None
+    anthropic_auth_token_set: bool = False
+    anthropic_model: str | None = None
+
+    def auth_summary(self) -> str:
+        """A masked, human-readable description of how the model will be reached.
+
+        Never includes a full key or token — only presence and a short prefix — so
+        it is safe to log and to send back over Telegram.
+        """
+        base = self.anthropic_base_url or "default (api.anthropic.com)"
+        token = "set" if self.anthropic_auth_token_set else "unset"
+        return (
+            f"API key: {_mask(self.anthropic_api_key)} · "
+            f"auth token: {token} · "
+            f"base URL: {base} · "
+            f"model: {self.anthropic_model or 'default'}"
+        )
 
 
 def load_settings(env_file: str | os.PathLike[str] | None = ".env") -> Settings:
@@ -76,4 +104,7 @@ def load_settings(env_file: str | os.PathLike[str] | None = ".env") -> Settings:
         workdir=Path(os.getenv("WORKDIR", ".")),
         system_prompt=os.getenv("CLAUDE_SYSTEM_PROMPT", "").strip() or None,
         notebooklm_notebook=os.getenv("NOTEBOOKLM_NOTEBOOK", "").strip() or None,
+        anthropic_base_url=os.getenv("ANTHROPIC_BASE_URL", "").strip() or None,
+        anthropic_auth_token_set=bool(os.getenv("ANTHROPIC_AUTH_TOKEN", "").strip()),
+        anthropic_model=os.getenv("ANTHROPIC_MODEL", "").strip() or None,
     )

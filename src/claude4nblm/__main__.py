@@ -47,6 +47,7 @@ def main() -> None:
         print(f"Configuration error: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    log.info("Model auth — %s", settings.auth_summary())
     if not settings.anthropic_api_key:
         log.warning(
             "ANTHROPIC_API_KEY is not set; relying on an existing Claude Code "
@@ -55,8 +56,21 @@ def main() -> None:
 
     bridge = TelegramBridge(settings)
 
+    async def _preflight() -> None:
+        """Verify model access once at startup; log the real cause on failure."""
+        try:
+            reply = await bridge.runner.ping()
+            log.info("Model preflight OK (%r)", reply[:40])
+        except Exception:  # noqa: BLE001 — non-fatal; keep the bot up for /diag
+            log.exception(
+                "Model preflight FAILED — the bot is up but model calls will error. "
+                "Check ANTHROPIC_API_KEY (valid & funded) and that ANTHROPIC_BASE_URL "
+                "is unset unless you intend to use a gateway."
+            )
+
     async def _post_init(app: Application) -> None:
         app.create_task(_stdin_pairing_loop(bridge))
+        app.create_task(_preflight())
 
     bridge.app.post_init = _post_init
 
